@@ -7,16 +7,21 @@ says "figure out", resist looking up a finished manifest; `kubectl explain` and
 
 Order matters. Each stage produces something the next one needs.
 
+**Scope.** Stages 1-8 are the whole sandbox: basic kind setup and deployment,
+finishing when your own image serves traffic through an Ingress and you can
+diagnose each layer when it breaks. Helm, GitOps, CI and observability are
+filmory's phases, not stages here — see [where this ends](#where-this-ends).
+
 ## index
 - [Stage 1 — Make the tools runnable](#stage-1--make-the-tools-runnable)
 - [Stage 2 — A cluster the lazy way](#stage-2--a-cluster-the-lazy-way)
 - [Stage 3 — A cluster you designed](#stage-3--a-cluster-you-designed)
-- [Stage 4 — Your first Pod](#stage-4--your-first-pod)
+- [Stage 4 — First Pod](#stage-4--first-pod)
 - [Stage 5 — Deployment](#stage-5--deployment)
 - [Stage 6 — Service](#stage-6--service)
 - [Stage 7 — Ingress](#stage-7--ingress)
 - [Stage 8 — Your own image](#stage-8--your-own-image)
-- [Then what](#then-what)
+- [Where this ends](#where-this-ends)
 
 ---
 
@@ -24,9 +29,9 @@ Order matters. Each stage produces something the next one needs.
 
 `kind get clusters` fails right now with *"No version is set for shim: kind"*.
 mise puts shims on `PATH`, not binaries — the tool is downloaded but no version
-is selected, and the shim refuses to guess. Fixing this is stage 1.
+is selected, and the shim refuses to guess. Fixing this is stage 1.  **— done 2026-09-09**
 
-- [ ] Install `mise` CLI
+- [x] Install `mise` CLI
 ```bash
 curl https://mise.run | sh
 
@@ -34,14 +39,14 @@ curl https://mise.run | sh
 ~/.local/bin/mise --version
 # mise 2026.x.x
 ``` 
-- [ ] Run `mise ls` — see what is already downloaded
-- [ ] Run `which -a kubectl` — **there is more than one.** Something outside
+- [x] Run `mise ls` — see what is already downloaded
+- [x] Run `which -a kubectl` — **there is more than one.** Something outside
       mise provides a kubectl too. Work out which wins and why
-- [ ] Pin versions for this directory (try `mise use kind@0.32.0`, then read the
+- [x] Pin versions for this directory (try `mise use kind@0.32.0`, then read the
       `mise.toml` it wrote — decide if you want the others pinned too)
-- [ ] Verify: `kind get clusters` exits clean with no output
-- [ ] Verify: `kubectl version --client` now matches what `mise ls` reports
-- [ ] write a script to check+download the needed tools 
+- [x] Verify: `kind get clusters` exits clean with no output
+- [x] Verify: `kubectl version --client` now matches what `mise ls` reports
+- [x] write a script to check+download the needed tools 
 
 **Why bother:** filmory pins the same way. A cluster built with one kubectl and
 driven by another is a genuine source of weird failures, and pinning is what
@@ -50,20 +55,38 @@ makes the mismatch visible instead of mysterious.
 ## Stage 2 — A cluster the lazy way
 
 Before writing any config, make the default cluster so you have something to
-compare against.
+compare against. **This one is deliberately a single node** — no config file, no
+workers. The three-node cluster is stage 3; the point here is to see what the
+defaults give you, so the config you write next has something to differ from.
 
-- [ ] `kind create cluster --name scratch`
-- [ ] `kubectl get nodes` — how many? What roles?
-- [ ] `docker ps` — **find your node in the list.** This is the whole idea of
+- [x] `kind create cluster --name k8s-sandbox`
+- [x] `kubectl get nodes` — how many? What roles?
+- [x] `docker ps` — **find your node in the list.** This is the whole idea of
       kind: a "node" is a Docker container
-- [ ] `docker exec -it scratch-control-plane crictl ps` — the containers running
+- [x] `docker exec -it k8s-sandbox-control-plane crictl ps` — the containers running
       *inside* the node. Note this is `crictl`, not `docker`
+```bash
+➜  k8s-sandbox git:(master) ✗ docker exec -it k8s-sandbox-control-plane crictl ps
+CONTAINER           IMAGE               CREATED             STATE               NAME                      ATTEMPT             POD ID              POD                                                 NAMESPACE
+e9a503ee3549f       fe81a497e85f1       5 minutes ago       Running             coredns                   0                   03b2296300bb1       coredns-589f44dc88-drsp8                            kube-system
+a0162a73356c5       fe81a497e85f1       5 minutes ago       Running             coredns                   0                   81de1131088c4       coredns-589f44dc88-hp742                            kube-system
+41e2f7c6e063b       3501a03785a84       5 minutes ago       Running             local-path-provisioner    0                   b217814aede3b       local-path-provisioner-855c7b7774-p88w2             local-path-storage
+e3f50943475cf       f2ede2b789a61       6 minutes ago       Running             kindnet-cni               0                   7bb774f7d7771       kindnet-rx4k6                                       kube-system
+65650b39bd2b5       01ad784c02283       6 minutes ago       Running             kube-proxy                0                   4002102753e9a       kube-proxy-r4rs9                                    kube-system
+8cf057235f944       4923943f21256       6 minutes ago       Running             kube-apiserver            0                   2019d13415ab3       kube-apiserver-k8s-sandbox-control-plane            kube-system
+d95758d134b75       39d983367f38c       6 minutes ago       Running             kube-controller-manager   0                   7408e699b97df       kube-controller-manager-k8s-sandbox-control-plane   kube-system
+fc83e0a3a8a20       76e62361b06b5       6 minutes ago       Running             kube-scheduler            0                   dd8fd1c145b37       kube-scheduler-k8s-sandbox-control-plane            kube-system
+469ca78e7b5ea       6da6ea097b384       6 minutes ago       Running             etcd                      0                   eb3aaec006069       etcd-k8s-sandbox-control-plane                      kube-system
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug k8s-sandbox-control-plane
+    Learn more at https://docs.docker.com/go/debug-cli/
+```
 - [ ] Find the API server port: `docker ps` shows `127.0.0.1:5xxxx->6443`.
       Confirm it matches `kubectl config view --minify`
-- [ ] `kind delete cluster --name scratch`
+- [ ] `kind delete cluster --name k8s-sandbox`
 
-**Answer before moving on:** why is the kubeconfig pointing at a random high
-port on localhost rather than at 6443?
+**Answer before moving on:** why is the kubeconfig pointing at a random high port on localhost rather than at 6443?
 
 ## Stage 3 — A cluster you designed
 
@@ -71,13 +94,13 @@ Now write the config. Aim for 1 control-plane + 2 workers, and port mappings so
 you can reach the cluster from your browser later without `port-forward`.
 
 - [ ] Read the [kind configuration docs](https://kind.sigs.k8s.io/docs/user/configuration/)
-- [ ] Write `clusters/sandbox.yaml` — set `kind: Cluster`, the apiVersion, and a
+- [ ] Write `clusters/k8s-sandbox.yaml` — set `kind: Cluster`, the apiVersion, and a
       `nodes:` list
 - [ ] Add `extraPortMappings` on the control-plane: container 80 → host 8080,
       container 443 → host 8443. **Note these are per-node, not per-cluster**
 - [ ] Add a `node-labels: ingress-ready=true` kubeadm patch on the control-plane.
       You will not use it until stage 7 — work out now what it is *for*
-- [ ] `kind create cluster --config clusters/sandbox.yaml`
+- [ ] `kind create cluster --config clusters/k8s-sandbox.yaml`
 - [ ] Nodes come up `NotReady` then go `Ready`. Watch it: `kubectl get nodes -w`.
       **Figure out what has to start before a node is Ready**
 - [ ] `kubectl get pods -n kube-system` — identify what each one does. You should
@@ -171,25 +194,33 @@ An Ingress object does nothing on its own. It is inert config until a
 
 ---
 
-## Then what
+## Where this ends
 
-Once stages 1–8 are done you have the fundamentals, and the sandbox has served
-its purpose. From here, rehearse each filmory phase here first, then do it for
-real over there. Track the phase order in
-[filmory/INFRA.md](../filmory/INFRA.md), not the README's stack table —
-INFRA.md explicitly warns against working down the table.
+Stage 8 is the finish line. At that point you can build a cluster, get your own
+image serving traffic through an Ingress, and tell the failure modes apart —
+which was the whole objective.
 
-- [ ] **Helm** (filmory Phase 4b, next up there) — `helm create` a chart for the
-      app you already built by hand. Template the replica count and image tag.
-      Helm comes first because every later component installs *as* a chart
-- [ ] **Kustomize** — dev/prod overlays over the same base
-- [ ] **ArgoCD** (Phase 5) — point an Application at a repo, then
-      `kubectl edit` something by hand and watch it get reverted
-- [ ] **CI** (Phase 6) — build, `kind load`, roll out
-- [ ] Platform layers (Phase 7+) — cert-manager, Prometheus, Loki
+What comes next belongs to **filmory**, not here. Listed so the handover is
+obvious, but these are not sandbox stages and there is nothing to tick off:
 
-**Worth raising when you get there:** stage 7 teaches the `networking.k8s.io/v1`
-Ingress, but filmory's stack table specifies **Gateway API** instead. They are
-different APIs solving the same problem. Learn Ingress first — it is simpler and
-everything is written about it — then port this sandbox to Gateway API as its
-own exercise before committing to it in filmory.
+| what | filmory phase |
+|---|---|
+| Helm — chart per service | Phase 4b, next up there |
+| Kustomize — dev/staging/prod overlays | with 4b |
+| ArgoCD — GitOps sync | Phase 5 |
+| CI — build, push, bump the tag | Phase 6 |
+| cert-manager, Prometheus, Loki | Phase 7+ |
+
+Track the order in [filmory/INFRA.md](../filmory/INFRA.md), not the README's
+tech table — INFRA.md deliberately works as a walking skeleton and warns against
+working down the table.
+
+**Come back here** only when one of those needs a throwaway cluster to fail on
+first: a chart that will not template, a controller that will not schedule, an
+overlay that produces the wrong YAML. That is the sandbox earning its keep, and
+it does not need a new curriculum.
+
+**One divergence to decide when you get there:** stage 7 teaches the
+`networking.k8s.io/v1` Ingress, but filmory's stack table specifies **Gateway
+API**. Different APIs, same problem. Learn Ingress first — simpler, and far more
+written about — then port it as its own exercise before committing in filmory.
