@@ -1,10 +1,143 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+
+# Each list item => one Docker container that becomes a Kubernetes node
 nodes:
-- role: control-plane
-- role: worker
-- role: worker
-- role: worker
-networking:
-  # the default CNI will not be installed
-  disableDefaultCNI: true
+    # Everything indented to HERE (aligned with "role:") is a key of this same node.
+    # The "- " only marks where the list item starts.
+  - role: control-plane
+
+    # extraPortMappings punches holes from Mac into the node container,
+    # so can reach Services from the host browser (docker run -p, basically).
+    # Without this, a NodePort/Ingress inside kind is unreachable from outside.
+    extraPortMappings:
+      - containerPort: 80   # port inside the node container (where ingress listens)
+        hostPort: 8080      # port on Mac -> http://localhost:8080
+        protocol: TCP
+      - containerPort: X    # HTTPS side of the same ingress controller
+        hostPort: 8443      # -> https://localhost:8443
+        protocol: TCP
+
+    # kubeadmConfigPatches: extra config merged into the kubeadm setup kind runs when bootstrapping this node.
+    # Here it's used purely to label the node.
+    kubeadmConfigPatches:
+      # "|" => YAML block scalar: everything indented under it is one raw string,
+      # which kind hands to kubeadm as its own little YAML document.
+      - |
+        kind: InitConfiguration
+        notdeRegistration:      
+          kubeletExtraArgs:    
+            notde-labels: "ingress-ready=true"
+
+  # Worker nodes: no control-plane components, they only run workloads.
+  # Two of them lets see scheduling spread pods across nodes.
+  - role: worker
+  - role: worker
+
+# networking:
+#   # Skip installing kindnet, the default CNI. Only do this if plan to
+#   # install own (Calico, Cilium...). Otherwise nodes stay NotReady
+#   # and no pod ever gets an IP.
+#   disableDefaultCNI: true
+
+
+
+
+
+
+
+
+
+
+### NOTES ### 
+
+
+
+
+# ============================================================================
+#  HOW THIS FILE IS USED  (1) at build time
+# ============================================================================
+#
+#   $ kind create cluster --config clusters/k8s-sandbox.yaml
+#            │
+#            ▼
+#   ┌──────────────────────────────────────────────────────────────┐
+#   │  this YAML                                                   │
+#   │                                                              │
+#   │  nodes:                  ──────► how many containers to make │
+#   │  extraPortMappings:      ──────► docker run -p 8080:80       │
+#   │  kubeadmConfigPatches:   ──────► kubelet flags / node labels │
+#   └──────────────────────────────────────────────────────────────┘
+#            │
+#            │  kind translates it into "docker run" + "kubeadm init/join"
+#            ▼
+#   ┌─────────────────────── Docker on Mac ───────────────────┐
+#   │                                                              │
+#   │   ┌─────────────────────┐  ┌───────────┐  ┌───────────┐      │
+#   │   │ control-plane       │  │ worker    │  │ worker    │      │
+#   │   │                     │  │           │  │           │      │
+#   │   │  kube-apiserver     │  │  kubelet  │  │  kubelet  │      │
+#   │   │  etcd               │  │  kube-    │  │  kube-    │      │
+#   │   │  scheduler          │  │   proxy   │  │   proxy   │      │
+#   │   │  controller-manager │  │           │  │           │      │
+#   │   │  kubelet            │  │           │  │           │      │
+#   │   │                     │  │           │  │           │      │
+#   │   │  label:             │  │           │  │           │      │
+#   │   │  ingress-ready=true │  │           │  │           │      │
+#   │   └─────────────────────┘  └───────────┘  └───────────┘      │
+#   │      ports 80,443 published        no published ports        │
+#   └──────────────────────────────────────────────────────────────┘
+#            │
+#            ▼
+#   ~/.kube/config gets a new context: kind-k8s-sandbox
+#   -> now "kubectl get nodes" talks to the control-plane container
+#
+#
+# ============================================================================
+#  HOW THIS FILE IS USED  (2) at run time - the request path
+# ============================================================================
+#
+#   browser
+#   http://localhost:8080
+#         │
+#         │  (A) extraPortMappings
+#         │      hostPort 8080  ->  containerPort 80
+#         ▼
+#   ┌─── control-plane container ──────────────────────────────────┐
+#   │  :80                                                         │
+#   │    │                                                         │
+#   │    │  (B) ingress-nginx pod landed on THIS node because its  │
+#   │    │      nodeSelector wants label ingress-ready=true,       │
+#   │    │      which kubeadmConfigPatches set                     │
+#   │    ▼                                                         │
+#   │  [ ingress-nginx ]                                           │
+#   │    │                                                         │
+#   │    │  (C) reads Ingress rules: which host/path -> which Svc  │
+#   └────┼─────────────────────────────────────────────────────────┘
+#        ▼
+#     Service  (stable virtual IP + DNS name inside the cluster)
+#        │
+#        │  (D) kube-proxy load-balances to a healthy Pod,
+#        │      which may be on either worker node
+#        ▼
+#     ┌──────────┐        ┌──────────┐
+#     │ Pod      │   or   │ Pod      │
+#     │ worker 1 │        │ worker 2 │
+#     └──────────┘        └──────────┘
+#
+#   Break any one link and get a different symptom:
+#     no (A) -> "connection refused" from the browser
+#     no (B) -> ingress-nginx pod stuck Pending forever
+#     no (C) -> 404 from nginx (it answered, but had no rule to match)
+#     no (D) -> 503 (rule matched, but no Pod is Ready behind the Service)
+
+
+# notdeRegistration:     # how this node registers itself with the API server 
+
+      # - |
+      #   kind: InitConfiguration
+      #   notdeRegistration:      
+      #     kubeletExtraArgs:    
+      #       notde-labels: "ingress-ready=true"
+      ## ^ that label is what the nginx ingress controller's nodeSelector looks
+      ##   for. No label -> the ingress pod stays Pending forever.
