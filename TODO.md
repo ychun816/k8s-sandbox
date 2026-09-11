@@ -215,7 +215,7 @@ kubectl wait --for=condition=Ready pod/nginx --timeout=120s
 
 ## Stage 5 — Deployment
 
-- [ ] Write a Deployment with 3 replicas
+- [x] Write a Deployment with 3 replicas
 > example : [Kubernetes Deployment YAML: 3 examples and expert tips](https://octopus.com/devops/kubernetes-deployments/kubernetes-yaml/)
 > verify:
 ```bash
@@ -241,15 +241,15 @@ kubectl get deployment nginx \
 # shows the ReplicaSet that the Deployment created automatically.
 kubectl get replicasets
 ``` 
-- [ ] `kubectl get replicaset` -> shows the ReplicaSet that the Deployment created automatically.
-- [ ] Delete Pods and watch them return
+- [x] `kubectl get replicaset` -> shows the ReplicaSet that the Deployment created automatically.
+- [x] Delete Pods and watch them return
 > verify:
 ```bash
 kubectl delete pod -l app=nginx
 # Watch the replacement Pods
 kubectl get pods -l app=nginx -w
 ```
-- [ ] `kubectl scale` to 5, then back
+- [x] `kubectl scale` to 5, then back
 ```bash
 kubectl scale deployment nginx --replicas=5  # scale to 5
 kubectl scale deployment nginx --replicas=3  # scale back to 3
