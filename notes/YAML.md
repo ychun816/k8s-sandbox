@@ -1,13 +1,31 @@
-# yaml.md
+# YAML and Kubernetes manifests
 
+## Index
 
-## index 
-
+- [YAML and manifests](#yaml-and-manifests)
+- [Notes on syntax](#notes-on-syntax)
+   - [Kind port mappings](#kind-port-mappings)
+   - [Container ports](#container-ports)
+   - [Resources](#resources)
+   - [Requests](#requests)
+   - [Limits](#limits)
+   - [Selectors and templates](#selectors-and-templates)
+   - [Readiness probe](#readiness-probe)
+   - [Service ports](#service-ports)
 
 
 ---
 
-## notes on syntaxes
+## YAML and manifests
+
+- `YAML` is the file format.
+- A `manifest` is a YAML file that describes a Kubernetes resource's desired state.
+
+For example, a Deployment manifest describes the Pods Kubernetes should manage.
+
+---
+
+## Notes on syntax
 
 
 ```
@@ -16,14 +34,14 @@ node 1: role=worker         keys=["role"]
 node 2: role=worker         keys=["role"]
 ```
 
-### `extraPortMappings`
+### Kind port mappings
 - `extraPortMappings` has nothing to do with the control-plane role. 
 - It's there because you plan to run an ingress controller, and that ingress controller happens to be scheduled onto the control-plane node. The full chain is three hops:
 ```
 localhost:8080  →  node container :80  →  ingress-nginx pod's hostPort 80
    (extraPortMappings)                       (set by the ingress manifest)
 ```
-### `containerPort` `80` `8080` `443` `8443`
+### Container ports
 
 These are TCP port numbers:
 
@@ -44,13 +62,8 @@ Port `8080` is used instead of host port `80`, and `8443` instead of host port
 on the Mac. The mappings only create the path; the Ingress controller must
 listen on ports `80` and `443` inside the node before requests can succeed.
 
----
 
-## yaml ? / manifest? 
-- `YAML`: the file format
-- `Manifest`: the file’s purpose, describing a Kubernetes resource
-
-### `resources`
+### Resources
 
 The `resources` field describes how much CPU and memory a container is
 expected to use. It has two main parts: `requests` and `limits`.
@@ -64,7 +77,7 @@ resources:
       memory: "256Mi"
 ```
 
-### `requests`
+### Requests
 
 A request is the amount of CPU or memory Kubernetes reserves for scheduling.
 The scheduler compares the request with the resources already requested on each
@@ -77,7 +90,7 @@ node. If a node cannot satisfy the request, the Pod stays `Pending`.
 Requests are not a live usage measurement and are not a guarantee that the
 container will always consume exactly that amount.
 
-### `limits`
+### Limits
 
 - the max resource the container may use while running. 
 - a memory limit is enforced at runtime: if the container exceeds it, Kubernetes may terminate it with an out-of-memory kill. 
@@ -92,13 +105,29 @@ limit:   cap usage during runtime
 - A request that is too small -> can cause a node to be overpacked, while a limit that is too small can cause restarts. 
 - These values are not arbitrary in production- > measure the application and adjust them.
 
-#### `selectors` 
-By using selectors, Kubernetes can manage the lifecycle of specific pod groups, ensuring that the right pods are created, updated, or deleted as per the deployment’s specifications.
+### Selectors and templates
 
-### `templates`
-includes nested fields such as metadata, spec, and others that outline the configuration for each pod, including the container images to use, resource requests and limits, and environment variables. Essentially, the template provides a reusable pod definition that ensures consistency when scaling up the deployment.
+A Deployment's selector identifies the Pods it manages. The selector must match
+the labels in the Pod template:
 
-### `readinessProbe`
+```yaml
+selector:
+   matchLabels:
+      app: nginx
+template:
+   metadata:
+      labels:
+         app: nginx
+```
+
+If these labels do not match, Kubernetes rejects the Deployment or the
+Deployment cannot manage the intended Pods.
+
+The `template` is the reusable Pod blueprint. It includes the container image,
+resources, probes, environment, and other Pod settings used when creating or
+replacing replicas.
+
+### Readiness probe
 
 A `readinessProbe` tells Kubernetes whether a running container is ready to
 receive traffic. It is different from whether the container process is alive:
@@ -123,7 +152,27 @@ If it fails, the container can remain `Running` but the Pod becomes not Ready,
 so Services remove it from their ready endpoints. A failed readiness probe does
 not restart the container; a liveness probe is used for restart decisions.
 
--- 
+
+### Service ports
+
+A Service provides a stable address and forwards traffic to selected Pods:
+
+```yaml
+ports:
+   - protocol: TCP
+      port: 80
+      targetPort: 80
+```
+
+- `port`: the port exposed by the Service inside the cluster.
+- `targetPort`: the port on the selected Pod/container receiving traffic.
+- `protocol: TCP`: explicit here, although TCP is the default.
+
+For Nginx, both values are `80` because Nginx listens on HTTP port `80`.
+The Service selects Pods using labels, for example `app: nginx`, and normally
+routes only to Pods whose readiness probe has succeeded.
+
+---
 
 ## resources / manual 
 
