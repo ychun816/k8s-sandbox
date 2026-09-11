@@ -14,7 +14,7 @@ nodes:
       - containerPort: 80   # port inside the node container (where ingress listens)
         hostPort: 8080      # port on Mac -> http://localhost:8080
         protocol: TCP
-      - containerPort: X    # HTTPS side of the same ingress controller
+      - containerPort: 443  # HTTPS side of the same ingress controller
         hostPort: 8443      # -> https://localhost:8443
         protocol: TCP
 
@@ -25,9 +25,9 @@ nodes:
       # which kind hands to kubeadm as its own little YAML document.
       - |
         kind: InitConfiguration
-        notdeRegistration:      
-          kubeletExtraArgs:    
-            notde-labels: "ingress-ready=true"
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
 
   # Worker nodes: no control-plane components, they only run workloads.
   # Two of them lets see scheduling spread pods across nodes.

@@ -13,6 +13,16 @@ diagnose each layer when it breaks. Helm, GitOps, CI and observability are
 filmory's phases, not stages here — see [where this ends](#where-this-ends).
 
 ## index
+Stage 1: [prepare the tools] Installs and pins `kind`, `kubectl`, and other tools
+Stage 2: [create a default platform] Creates a default, single-node Kubernetes cluster
+Stage 3: [design the platform] cluster exists => Creates a deliberate 3-node cluster from YAML
+Stage 4: [run an application on it] one Pod exists, but nothing recreates it => Runs the `nginx` Pod inside the cluster
+> placing a workload Pod inside the existing cluster, and Kubernetes chooses the node
+Stage 5: Deployment manages Pods and recreates them
+Stage 6: Service gives Pods a stable network address
+Stage 7: Ingress exposes the Service externally
+
+
 - [Stage 1 — Make the tools runnable](#stage-1--make-the-tools-runnable)
 - [Stage 2 — A cluster the lazy way](#stage-2--a-cluster-the-lazy-way)
 - [Stage 3 — A cluster you designed](#stage-3--a-cluster-you-designed)
@@ -88,7 +98,7 @@ What's next:
 
 **Answer before moving on:** why is the kubeconfig pointing at a random high port on localhost rather than at 6443?
 
-## Stage 3 — A cluster you designed
+## Stage 3 — A cluster customized/designed
 
 Now write the config. Aim for 1 control-plane + 2 workers, and port mappings so
 you can reach the cluster from your browser later without `port-forward`.
@@ -100,7 +110,18 @@ you can reach the cluster from your browser later without `port-forward`.
       container 443 → host 8443. **Note these are per-node, not per-cluster**
 - [ ] Add a `node-labels: ingress-ready=true` kubeadm patch on the control-plane.
       You will not use it until stage 7 — work out now what it is *for*
-- [ ] `kind create cluster --config clusters/k8s-sandbox.yaml`
+- [ ] `kind create cluster --name k8s-sandbox --config clusters/k8s-sandbox.yaml`
+- [ ] verify:
+```bash
+# check existing clusters
+kind get clusters
+
+# check exsiting nodes (all)
+kubectl get nodes -w
+
+# check exisitng , specify a name
+kind get nodes --name k8s-sandbox
+```
 - [ ] Nodes come up `NotReady` then go `Ready`. Watch it: `kubectl get nodes -w`.
       **Figure out what has to start before a node is Ready**
 - [ ] `kubectl get pods -n kube-system` — identify what each one does. You should
@@ -111,6 +132,20 @@ you can reach the cluster from your browser later without `port-forward`.
       pinning the node image or moving kubectl's pin
 
 ## Stage 4 — First Pod
+
+restart cluster 
+```bash
+open -a Docker
+
+docker ps
+kind get nodes --name k8s-sandbox
+kubectl get nodes
+
+kubectl run web --image=nginx
+kubectl get pod -o wide
+kubectl describe pod web
+```
+
 
 - [ ] `kubectl run` a single pod imperatively — any small image
 - [ ] `kubectl get pod -o wide` — which node did it land on? Who chose?

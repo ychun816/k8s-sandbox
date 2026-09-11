@@ -143,6 +143,26 @@ understand what a NodePort or an ingress controller actually is.
 
 ---
 
+## compare : kind vs. terraform 
+
+| | **Kind** | **Terraform** |
+|---|---|---|
+| Main purpose | Run a local Kubernetes cluster in Docker | Provision and manage infrastructure through providers |
+| What it creates | Docker containers that act as Kubernetes nodes | Cloud or local resources such as networks, VMs, databases, and clusters |
+| Configuration | Kind YAML, focused on Kubernetes cluster bootstrapping | HCL files describing infrastructure resources |
+| State management | Discovers the cluster through Docker and kubeconfig | Stores state to track resources and compare desired versus actual infrastructure |
+| Typical scope | Local development, learning, and CI tests | Repeatable infrastructure across environments and teams |
+| Lifecycle | `kind create`, `kind get`, and `kind delete` | `terraform plan`, `terraform apply`, and `terraform destroy` |
+| Kubernetes workloads | Does not deploy application workloads by itself | Can manage Kubernetes resources through a provider, but is usually used for infrastructure |
+| Relationship | Can create the Kubernetes cluster that Terraform or `kubectl` uses | Can create infrastructure first, then configure Kubernetes with `kubectl`, Helm, or a Kubernetes provider |
+
+Kind is similar to Terraform only at the infrastructure layer: both describe
+what should exist and create it. Kind is a specialized tool for a local
+Kubernetes cluster, while Terraform is a general infrastructure-as-code tool
+with providers, a plan phase, and persistent state.
+
+---
+
 ## resource
 
 ### certificate course 
