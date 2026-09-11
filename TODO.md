@@ -166,7 +166,7 @@ kubectl run web --image=nginx --dry-run=client -o yaml \
 code manifests/web-pod.yaml  ## -> seems not working  # vscode is not on PATH
 open -a "Visual Studio Code" manifests/web-pod.yaml
 
-# Validate the YAML
+# Validate the YAML => !! ONLY VALIDATE; NOT ADD AYTHING TO CLUSTER !! 
 kubectl apply --dry-run=client -f manifests/web-pod.yaml
 
 
@@ -179,6 +179,34 @@ kubectl get pod web -o wide
 
 - [ ] Add `resources.requests` and a `limits.memory`. **Work out what the
       scheduler does with `requests` that it does not do with `limits`**
+> Verify resources in yaml -> Apply the manifest to the cluster -> Delete the standalone Pod -> Restore the Pod from YAML
+```bash
+# Verify resources are in the YAML file:
+sed -n '1,30p' manifests/web-pod.yaml
+
+# Confirm Kubernetes accepts the file without changing anything:
+kubectl apply --dry-run=client -f manifests/web-pod.yaml
+
+# Run the real apply command, without --dry-run:
+# Expected : #pod/web configured
+kubectl apply -f manifests/web-pod.yaml
+
+# Verify that the Pod exists:
+kubectl get pod web -o wide
+
+# Verify the resources were actually stored on the Pod:
+# Expected output: map[limits:map[memory:256Mi] requests:map[cpu:100m memory:128Mi]]
+kubectl get pod web -o jsonpath='{.spec.containers[0].resources}{"\n"}'
+
+# can also inspect it in the readable description:
+kubectl describe pod web
+
+# !!  Pod is mostly immutable after creation -> for Pod specification changes
+# => should Delete the exisitng pod and then recreate it
+kubectl delete pod web
+kubectl apply -f manifests/web-pod.yaml
+kubectl wait --for=condition=Ready pod/web --timeout=120s
+```
 - [ ] `kubectl delete pod <name>` — note that nothing recreates it
 
 **That last bullet is the entire argument for stage 5.** Don't skip it.
