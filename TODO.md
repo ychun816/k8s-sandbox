@@ -100,18 +100,20 @@ What's next:
 
 ## Stage 3 — A cluster customized/designed
 
+**— done 2026-09-11**
+
 Now write the config. Aim for 1 control-plane + 2 workers, and port mappings so
 you can reach the cluster from your browser later without `port-forward`.
 
-- [ ] Read the [kind configuration docs](https://kind.sigs.k8s.io/docs/user/configuration/)
-- [ ] Write `clusters/k8s-sandbox.yaml` — set `kind: Cluster`, the apiVersion, and a
+- [x] Read the [kind configuration docs](https://kind.sigs.k8s.io/docs/user/configuration/)
+- [x] Write `clusters/k8s-sandbox.yaml` — set `kind: Cluster`, the apiVersion, and a
       `nodes:` list
-- [ ] Add `extraPortMappings` on the control-plane: container 80 → host 8080,
+- [x] Add `extraPortMappings` on the control-plane: container 80 → host 8080,
       container 443 → host 8443. **Note these are per-node, not per-cluster**
-- [ ] Add a `node-labels: ingress-ready=true` kubeadm patch on the control-plane.
+- [x] Add a `node-labels: ingress-ready=true` kubeadm patch on the control-plane.
       You will not use it until stage 7 — work out now what it is *for*
-- [ ] `kind create cluster --name k8s-sandbox --config clusters/k8s-sandbox.yaml`
-- [ ] verify:
+- [x] `kind create cluster --name k8s-sandbox --config clusters/k8s-sandbox.yaml`
+- [x] verify:
 ```bash
 # check existing clusters
 kind get clusters
@@ -122,12 +124,12 @@ kubectl get nodes -w
 # check exisitng , specify a name
 kind get nodes --name k8s-sandbox
 ```
-- [ ] Nodes come up `NotReady` then go `Ready`. Watch it: `kubectl get nodes -w`.
+- [x] Nodes come up `NotReady` then go `Ready`. Watch it: `kubectl get nodes -w`.
       **Figure out what has to start before a node is Ready**
-- [ ] `kubectl get pods -n kube-system` — identify what each one does. You should
+- [x] `kubectl get pods -n kube-system` — identify what each one does. You should
       be able to name the API server, etcd, scheduler, controller-manager, DNS,
       the CNI and kube-proxy
-- [ ] **Version skew check** (same as filmory Phase 1): compare the node version
+- [x] **Version skew check** (same as filmory Phase 1): compare the node version
       kind reports against `kubectl version`. More than one minor apart means
       pinning the node image or moving kubectl's pin
 
