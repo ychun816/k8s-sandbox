@@ -1,0 +1,12 @@
+# routes traffic to Pods that are already Ready:
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+    # - protocol: TCP       # protocol is optional because Kubernetes defaults it to TCP
+    - port: 80
+      targetPort: 80        # nginx listen to 80  # Service port 80 -> Pod/container port 80

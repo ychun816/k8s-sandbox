@@ -135,6 +135,8 @@ kind get nodes --name k8s-sandbox
 
 ## Stage 4 — First Pod
 
+**— done 2026-09-11**
+
 restart cluster 
 ```bash
 open -a Docker
@@ -143,82 +145,119 @@ docker ps
 kind get nodes --name k8s-sandbox
 kubectl get nodes
 
-kubectl run web --image=nginx
+kubectl run nginx --image=nginx
 kubectl get pod -o wide
-kubectl describe pod web
+kubectl describe pod nginx
 ```
 
 
-- [ ] `kubectl run` a single pod imperatively — any small image
-- [ ] `kubectl get pod -o wide` — which node did it land on? Who chose?
-- [ ] `kubectl describe pod` — read the Events at the bottom, top to bottom.
+- [x] `kubectl run` a single pod imperatively — any small image
+- [x] `kubectl get pod -o wide` — which node did it land on? Who chose?
+- [x] `kubectl describe pod` — read the Events at the bottom, top to bottom.
       That list is the scheduling story
-- [ ] Now write it as YAML in `manifests/`. Use
+- [x] Now write it as YAML in `manifests/`. Use
       `kubectl run ... --dry-run=client -o yaml` to get a skeleton, then strip
       every field you cannot justify
 > first generate a skeleton 
 ```bash
 #  not create a Pod. It only prints YAML into the file
-kubectl run web --image=nginx --dry-run=client -o yaml \
-  > manifests/web-pod.yaml
+kubectl run nginx --image=nginx --dry-run=client -o yaml \
+  > manifests/nginx-pod.yaml
 
 # open the file 
-code manifests/web-pod.yaml  ## -> seems not working  # vscode is not on PATH
-open -a "Visual Studio Code" manifests/web-pod.yaml
+code manifests/nginx-pod.yaml  ## -> seems not working  # vscode is not on PATH
+open -a "Visual Studio Code" manifests/nginx-pod.yaml
 
 # Validate the YAML => !! ONLY VALIDATE; NOT ADD AYTHING TO CLUSTER !! 
-kubectl apply --dry-run=client -f manifests/web-pod.yaml
+kubectl apply --dry-run=client -f manifests/nginx-pod.yaml
 
 
 # manage pod frm yaml file
-kubectl delete pod web
-kubectl apply -f manifests/web-pod.yaml
-kubectl get pod web -o wide
+kubectl delete pod nginx
+kubectl apply -f manifests/nginx-pod.yaml
+kubectl get pod nginx -o wide
 
 ```
 
-- [ ] Add `resources.requests` and a `limits.memory`. **Work out what the
+- [x] Add `resources.requests` and a `limits.memory`. **Work out what the
       scheduler does with `requests` that it does not do with `limits`**
 > Verify resources in yaml -> Apply the manifest to the cluster -> Delete the standalone Pod -> Restore the Pod from YAML
 ```bash
 # Verify resources are in the YAML file:
-sed -n '1,30p' manifests/web-pod.yaml
+sed -n '1,30p' manifests/nginx-pod.yaml
 
 # Confirm Kubernetes accepts the file without changing anything:
-kubectl apply --dry-run=client -f manifests/web-pod.yaml
+kubectl apply --dry-run=client -f manifests/nginx-pod.yaml
 
 # Run the real apply command, without --dry-run:
-# Expected : #pod/web configured
-kubectl apply -f manifests/web-pod.yaml
+# Expected : #pod/nginx configured
+kubectl apply -f manifests/nginx-pod.yaml
 
 # Verify that the Pod exists:
-kubectl get pod web -o wide
+kubectl get pod nginx -o wide
 
 # Verify the resources were actually stored on the Pod:
 # Expected output: map[limits:map[memory:256Mi] requests:map[cpu:100m memory:128Mi]]
-kubectl get pod web -o jsonpath='{.spec.containers[0].resources}{"\n"}'
+kubectl get pod nginx -o jsonpath='{.spec.containers[0].resources}{"\n"}'
 
 # can also inspect it in the readable description:
-kubectl describe pod web
+kubectl describe pod nginx
 
 # !!  Pod is mostly immutable after creation -> for Pod specification changes
 # => should Delete the exisitng pod and then recreate it
-kubectl delete pod web
-kubectl apply -f manifests/web-pod.yaml
-kubectl wait --for=condition=Ready pod/web --timeout=120s
+kubectl delete pod nginx
+kubectl apply -f manifests/nginx-pod.yaml
+kubectl wait --for=condition=Ready pod/nginx --timeout=120s
 ```
-- [ ] `kubectl delete pod <name>` — note that nothing recreates it
+- [x] `kubectl delete pod <name>` — note that nothing recreates it
 
 **That last bullet is the entire argument for stage 5.** Don't skip it.
 
 ## Stage 5 — Deployment
 
 - [ ] Write a Deployment with 3 replicas
+> example : [Kubernetes Deployment YAML: 3 examples and expert tips](https://octopus.com/devops/kubernetes-deployments/kubernetes-yaml/)
+> verify:
+```bash
+kubectl delete deployment ngnix --ignore-not-found
+kubectl apply -f manifests/base/ngnix/deployment.yaml
+# Watch the rollout
+kubectl rollout status deployment/nginx 
+# Check the Deployment summary
+kubectl get deployment nginx
+# List the Deployment’s Pods
+kubectl get pods -l app=nginx -o wide
+```
 - [ ] Get the `selector` / `template.metadata.labels` relationship right. Break
       it on purpose once and read the rejection — it is the most common mistake
-- [ ] `kubectl get replicaset` — you did not create this. What made it?
-- [ ] `kubectl delete pod -l <your-label>` and watch them return
+> verfiy selector relationship:
+```bash
+kubectl get deployment nginx \
+  -o jsonpath='{.spec.selector.matchLabels}{"\n"}'
+
+kubectl get deployment nginx \
+  -o jsonpath='{.spec.template.metadata.labels}{"\n"}'
+
+# shows the ReplicaSet that the Deployment created automatically.
+kubectl get replicasets
+``` 
+- [ ] `kubectl get replicaset` -> shows the ReplicaSet that the Deployment created automatically.
+- [ ] Delete Pods and watch them return
+> verify:
+```bash
+kubectl delete pod -l app=nginx
+# Watch the replacement Pods
+kubectl get pods -l app=nginx -w
+```
 - [ ] `kubectl scale` to 5, then back
+```bash
+kubectl scale deployment nginx --replicas=5  # scale to 5
+kubectl scale deployment nginx --replicas=3  # scale back to 3
+
+# verify state
+kubectl get deployment nginx
+kubectl get pods -l app=nginx
+```
 - [ ] Add a `readinessProbe`. Then break it (wrong port) and watch pods run but
       never become Ready. **Understand Running vs Ready before continuing**
 - [ ] Change the image tag, `kubectl rollout status`, then `kubectl rollout undo`
@@ -265,7 +304,7 @@ An Ingress object does nothing on its own. It is inert config until a
 | 404 from nginx | Controller reachable, no Ingress rule matched |
 | 503 from nginx | Rule matched, Service has no ready endpoints |
 
-## Stage 8 — Your own image
+## Stage 8 — MY own image
 
 - [ ] Build any trivial image locally with `docker build`
 - [ ] Deploy it. **It will fail with `ErrImagePull`** even though `docker images`

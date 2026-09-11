@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment        # signifying that the YAML file is intended to manage a deployment resource
+
+metadata:
+  name: nginx
+  labels:               # key-value pairs useful for organizing and selecting resources.
+    app: nginx
+  # namespace: Scopes the deployment within a particular namespace in the Kubernetes cluster.
+
+spec:
+  replicas: 3
+
+  selector:             # define a set of criteria used to identify the set of pods managed by the deployment
+    matchLabels:
+      app: nginx
+  
+  template:             # defines the blueprint for creating pods
+    metadata:
+      labels:
+        app: nginx        
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+
+        # Check whether Nginx is ready to receive traffic.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          # Wait before the first check while the container starts.
+          initialDelaySeconds: 5
+          # Repeat the readiness check every 5 seconds.
+          periodSeconds: 5
+
+
+
+### NOTES ###
+### validate and apply ###
+# kubectl delete deployment ngnix --ignore-not-found
+# kubectl apply --dry-run=client -f manifests/base/ngnix/deployment.yaml
+# kubectl apply -f manifests/base/ngnix/deployment.yaml
+# kubectl rollout status deployment/nginx
+# kubectl get deployment nginx
+# kubectl get pods -l app=nginx -o wide
+
+##################

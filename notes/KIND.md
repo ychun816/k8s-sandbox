@@ -72,7 +72,7 @@ at creation. Changing them means `kind delete cluster` then create again.
 Ordinary kubectl, nothing kind-specific:
 
 ```sh
-kubectl run web --image=nginx --dry-run=client -o yaml   # skeleton to edit
+kubectl run nginx --image=nginx --dry-run=client -o yaml   # skeleton to edit
 kubectl apply -f manifests/02-deployment/
 kubectl get pods -o wide                  # -o wide shows the NODE
 kubectl describe pod <name>               # Events at the bottom = the story

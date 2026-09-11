@@ -98,11 +98,20 @@ k8s-sandbox/
 ├── clusters/                   ─── stage 3 creates this ───
 │   └── k8s-sandbox.yaml        node topology + host port mappings
 │
-└── manifests/                  ─── stages 4-7 create these ───
-    ├── 01-pod/                 one directory per concept, applied in order
-    ├── 02-deployment/
-    ├── 03-service/
-    └── 04-ingress/
+└── manifests/                  Kubernetes resource definitions
+  ├── pods/                    standalone Pod learning example
+  │   └── nginx-pod.yaml
+  ├── base/                    reusable application resources
+  │   └── nginx/
+  │       ├── deployment.yaml
+  │       ├── service.yaml
+  │       ├── ingress.yaml
+  │       └── kustomization.yaml
+  └── overlays/                environment-specific configuration
+    ├── dev/
+    │   └── kustomization.yaml
+    └── prod/
+      └── kustomization.yaml
 ```
 
 Three kinds of file, and the distinction is worth keeping:
@@ -115,9 +124,11 @@ Three kinds of file, and the distinction is worth keeping:
   before. [KIND.md](notes/KIND.md) and [MISE.md](notes/MISE.md) are the two so
   far.
 
-Numbered manifest directories keep the apply order obvious: each one only makes
-sense once the previous exists, and `01-` sorts before `02-` for
-`kubectl apply -f`.
+The standalone Pod is kept outside the application base because it is a
+learning example, not part of the normal application deployment. The base
+contains reusable resources, while overlays select the base and add
+environment-specific changes. Kustomize applies resources through an explicit
+`kustomization.yaml`, so numbered directories are not necessary.
 
 ---
 
