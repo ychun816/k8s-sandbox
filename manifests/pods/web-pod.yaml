@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: web
+  name: ngnix
 spec:
   containers:
-    - name: web
+    - name: ngnix
       image: nginx
       resources:
         # Requests are used by the scheduler when choosing a node.
