@@ -49,3 +49,45 @@ listen on ports `80` and `443` inside the node before requests can succeed.
 ## yaml ? / manifest? 
 - `YAML`: the file format
 - `Manifest`: the file’s purpose, describing a Kubernetes resource
+
+## `resources`
+
+The `resources` field describes how much CPU and memory a container is
+expected to use. It has two main parts: `requests` and `limits`.
+
+```yaml
+resources:
+   requests:
+      cpu: "100m"
+      memory: "128Mi"
+   limits:
+      memory: "256Mi"
+```
+
+## `requests`
+
+A request is the amount of CPU or memory Kubernetes reserves for scheduling.
+The scheduler compares the request with the resources already requested on each
+node. If a node cannot satisfy the request, the Pod stays `Pending`.
+
+- `100m` CPU : means `0.1` CPU core.
+- `128Mi` : means 128 mebibytes of memory.
+- A request should represent normal or expected usage.
+
+Requests are not a live usage measurement and are not a guarantee that the
+container will always consume exactly that amount.
+
+## `limits`
+
+- the max resource the container may use while running. 
+- a memory limit is enforced at runtime: if the container exceeds it, Kubernetes may terminate it with an out-of-memory kill. 
+- The scheduler does not reserve node capacity from a limit; it uses requests for that decision.
+
+```text
+request: reserve capacity for scheduling
+limit:   cap usage during runtime
+```
+
+- The limit should normally be *greater* than the request so the container can handle short bursts. 
+- A request that is too small -> can cause a node to be overpacked, while a limit that is too small can cause restarts. 
+- These values are not arbitrary in production- > measure the application and adjust them.

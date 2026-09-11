@@ -1,21 +1,16 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  labels:
-    run: web
   name: web
 spec:
   containers:
-  - image: nginx
-    name: web
-    resources: {}
-  dnsPolicy: ClusterFirst
-  restartPolicy: Always
-status: {}
-
-
-
-
-# generate skeleton 
-# kubectl run web --image=nginx --dry-run=client -o yaml \
-#   > manifests/web-pod.yaml
+    - name: web
+      image: nginx
+      resources:
+        # Requests are used by the scheduler when choosing a node.
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        # The memory limit is the container's maximum runtime memory.
+        limits:
+          memory: "256Mi"
