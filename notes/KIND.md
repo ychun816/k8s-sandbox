@@ -1,7 +1,12 @@
-# Kind for k8s
+# Kind for Kubernetes
 
-## index 
+## index
 
+- [Understand Kind](#understand-kind)
+- [Common commands](#commonly-used-commands)
+- [Kind vs. Minikube](#compare--kind-vs-minikube)
+- [Kind vs. Terraform](#compare--kind-vs-terraform)
+- [Resources](#resource)
 
 --- 
 
@@ -47,7 +52,7 @@ docker exec -it k8s-sandbox-control-plane crictl ps
 ### stage 3 — a cluster you designed
 
 ```sh
-kind create cluster --config clusters/k8s-sandbox.yaml
+kind create cluster --name k8s-sandbox --config clusters/k8s-sandbox.yaml
 kubectl get nodes -w                      # watch NotReady -> Ready
 kubectl get pods -n kube-system           # the control plane itself
 ```
@@ -65,10 +70,11 @@ at creation. Changing them means `kind delete cluster` then create again.
 Ordinary kubectl, nothing kind-specific:
 
 ```sh
-kubectl run nginx --image=nginx --dry-run=client -o yaml   # skeleton to edit
-kubectl apply -f manifests/02-deployment/
+kubectl run nginx --image=nginx --dry-run=client -o yaml \
+	> manifests/pods/nginx-pod.yaml                 # skeleton to edit
+kubectl apply -f manifests/base/ngnix/deployment.yaml
 kubectl get pods -o wide                  # -o wide shows the NODE
-kubectl describe pod <name>               # Events at the bottom = the story
+kubectl describe pod nginx                # Events at the bottom = the story
 kubectl logs -f deploy/<name>
 kubectl get endpointslices -l kubernetes.io/service-name=<svc>
 ```
