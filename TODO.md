@@ -156,6 +156,27 @@ kubectl describe pod web
 - [ ] Now write it as YAML in `manifests/`. Use
       `kubectl run ... --dry-run=client -o yaml` to get a skeleton, then strip
       every field you cannot justify
+> first generate a skeleton 
+```bash
+#  not create a Pod. It only prints YAML into the file
+kubectl run web --image=nginx --dry-run=client -o yaml \
+  > manifests/web-pod.yaml
+
+# open the file 
+code manifests/web-pod.yaml  ## -> seems not working  # vscode is not on PATH
+open -a "Visual Studio Code" manifests/web-pod.yaml
+
+# Validate the YAML
+kubectl apply --dry-run=client -f manifests/web-pod.yaml
+
+
+# manage pod frm yaml file
+kubectl delete pod web
+kubectl apply -f manifests/web-pod.yaml
+kubectl get pod web -o wide
+
+```
+
 - [ ] Add `resources.requests` and a `limits.memory`. **Work out what the
       scheduler does with `requests` that it does not do with `limits`**
 - [ ] `kubectl delete pod <name>` — note that nothing recreates it

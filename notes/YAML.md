@@ -43,3 +43,9 @@ Port `8080` is used instead of host port `80`, and `8443` instead of host port
 `443`, to avoid privileged-port requirements and conflicts with other services
 on the Mac. The mappings only create the path; the Ingress controller must
 listen on ports `80` and `443` inside the node before requests can succeed.
+
+---
+
+## yaml ? / manifest? 
+- `YAML`: the file format
+- `Manifest`: the file’s purpose, describing a Kubernetes resource
