@@ -32,6 +32,7 @@ through an Ingress, and diagnose each layer when it fails. Anything past that
 - [quick start](#quick-start)
 - [cluster shape](#cluster-shape)
 - [roadmap](#roadmap)
+- [notes](#notes)
 - [relation to filmory](#relation-to-filmory)
 
 ---
@@ -100,9 +101,9 @@ k8s-sandbox/
 │
 └── manifests/                  Kubernetes resource definitions
   ├── pods/                    standalone Pod learning example
-  │   └── nginx-pod.yaml
+  │   └── web-pod.yaml
   ├── base/                    reusable application resources
-  │   └── nginx/
+  │   └── ngnix/
   │       ├── deployment.yaml
   │       ├── service.yaml
   │       ├── ingress.yaml
@@ -141,11 +142,25 @@ kind create cluster --config clusters/k8s-sandbox.yaml
 kubectl get nodes                 # expect 3, all Ready
 ```
 
-`clusters/k8s-sandbox.yaml` does not exist yet — writing it is stage 3, and
-`manifests/` fills up from stage 4. Until then only the first two lines run.
+`clusters/k8s-sandbox.yaml` is the Kind cluster definition. The standalone Pod
+under `manifests/pods/` is applied directly, while the application resources
+under `manifests/base/` are intended to be composed through Kustomize overlays.
 
 Tools come from `mise`, pinned per project. If a bare `kind` is not found, mise
 is not activated in your shell — see [notes/MISE.md](notes/MISE.md).
+
+To verify the current Deployment directly:
+
+```sh
+kubectl apply -f manifests/base/ngnix/deployment.yaml
+kubectl rollout status deployment/nginx
+kubectl get deployment nginx
+kubectl get pods -l app=nginx -o wide
+```
+
+The Deployment maintains three Nginx Pods through a ReplicaSet. Its readiness
+probe controls whether those running Pods are considered ready for Service
+traffic.
 
 ---
 
@@ -241,5 +256,7 @@ as its own exercise before committing to it there.
 
 ## notes
 
-- [notes/KIND.md](notes/KIND.md) — kind concepts, kind vs minikube
-- [notes/MISE.md](notes/MISE.md) — tool versions, command cheatsheet
+- [notes/KIND.md](notes/KIND.md) — Kind concepts, commands, and comparisons
+- [notes/MISE.md](notes/MISE.md) — tool versions and mise commands
+- [notes/PROTOCOL.md](notes/PROTOCOL.md) — networking protocol notes
+- [notes/YAML.md](notes/YAML.md) — YAML syntax and Kubernetes resource notes

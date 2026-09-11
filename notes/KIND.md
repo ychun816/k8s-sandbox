@@ -9,13 +9,6 @@
 - Kind (Kubernetes IN Docker) is an open-source tool for running local Kubernetes clusters using Docker containers as "nodes."
 - it uses Docker containers to simulate Kubernetes nodes. 
 
-
----
-
-
-
-
-
 ---
 
 ## commonly used commands
