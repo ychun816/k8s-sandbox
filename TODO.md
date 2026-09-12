@@ -258,18 +258,52 @@ kubectl scale deployment nginx --replicas=3  # scale back to 3
 kubectl get deployment nginx
 kubectl get pods -l app=nginx
 ```
-- [ ] Add a `readinessProbe`. Then break it (wrong port) and watch pods run but
+- [x] Add a `readinessProbe`. Then break it (wrong port) and watch pods run but
       never become Ready. **Understand Running vs Ready before continuing**
-- [ ] Change the image tag, `kubectl rollout status`, then `kubectl rollout undo`
+- [x] Change the image tag, `kubectl rollout status`, then `kubectl rollout undo`
 
 ## Stage 6 — Service
 
-- [ ] Write a ClusterIP Service selecting your pods
-- [ ] Get `port` vs `targetPort` right — say out loud which is which
-- [ ] `kubectl get endpointslices -l kubernetes.io/service-name=<svc>` —
+- [x] Write a ClusterIP Service selecting your pods
+- [x] Get `port` vs `targetPort` right — say out loud which is which
+- [x] `kubectl get endpointslices -l kubernetes.io/service-name=<svc>` —
       **this is the first thing to check whenever a Service "doesn't work"**
+> commands
+```bash
+# restart docker
+open -a Docker
+docker info
+kind get nodes --name k8s-sandbox
+kubectl get nodes
+
+# dry run test
+kubectl apply --dry-run=client \
+  -f manifests/base/ngnix/service.yaml
+
+# apply for real
+kubectl apply -f manifests/base/ngnix/service.yaml
+kubectl get service nginx
+kubectl get endpointslices \
+  -l kubernetes.io/service-name=nginx
+
+```
 - [ ] Break the selector on purpose. Confirm the endpoint list goes empty and
       the Service still exists and still resolves
+> checking commands
+```bash
+# 1. Confirm the working state => The EndpointSlice should contain the Pod IPs.
+kubectl get pods -l app=nginx --show-labels
+kubectl get service nginx
+kubectl get endpointslices \
+-l kubernetes.io/service-name=nginx
+
+# 2. Break the selector => change selector setting to "selector: app: test"
+# then apply 
+
+
+
+
+```
 - [ ] Exec into a pod and `curl` the Service by DNS name. Work out the full form
       (`<svc>.<namespace>.svc.cluster.local`) and why the short name also works
 - [ ] Try `type: LoadBalancer`. It will sit `<pending>` forever — **work out

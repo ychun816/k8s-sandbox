@@ -5,8 +5,28 @@ metadata:
   name: nginx
 spec:
   selector:
-    app: nginx
+    # app: nginx
+    app: test
   ports:
     # - protocol: TCP       # protocol is optional because Kubernetes defaults it to TCP
     - port: 80
       targetPort: 80        # nginx listen to 80  # Service port 80 -> Pod/container port 80
+
+
+### NOTES ###
+
+# restart docker
+# open -a Docker
+# docker info
+# kind get nodes --name k8s-sandbox
+
+
+# validate and apply (dry run)
+# kubectl apply --dry-run=client \
+#   -f manifests/base/ngnix/service.yaml
+
+# Then apply it for real:
+# kubectl apply -f manifests/base/ngnix/service.yaml
+# kubectl get service nginx
+# kubectl get endpointslices \
+#   -l kubernetes.io/service-name=nginx

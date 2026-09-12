@@ -172,7 +172,52 @@ For Nginx, both values are `80` because Nginx listens on HTTP port `80`.
 The Service selects Pods using labels, for example `app: nginx`, and normally
 routes only to Pods whose readiness probe has succeeded.
 
----
+## service.yaml
+
+A Service has two independent parts:
+
+```text
+Service object + ClusterIP + DNS
+            still exists
+
+Selector -> matching ready Pods
+            can be empty
+```
+
+- The Service object provides the stable name and ClusterIP.
+- The selector finds Pods whose labels match, such as `app: nginx`.
+- EndpointSlices record the matching ready Pod IP addresses.
+- A Service can exist and resolve through DNS while having no endpoints.
+
+That is why a Service can resolve correctly while traffic fails: a wrong
+selector may match no ready Pods. EndpointSlices are the first thing to check
+when a Service does not work.
+
+The failure experiment is:
+
+```yaml
+# broken Service selector
+selector:
+   app: wrong
+```
+
+```bash
+kubectl apply -f manifests/base/ngnix/service.yaml
+kubectl get service nginx
+kubectl get endpointslices \
+   -l kubernetes.io/service-name=nginx
+```
+
+The Service should still exist, while its EndpointSlice has no endpoints.
+Restore the selector and apply again:
+
+```yaml
+selector:
+   app: nginx
+```
+
+The Pod IP addresses should return to the EndpointSlice. After observing both
+states, the selector experiment is complete.
 
 ## resources / manual 
 
