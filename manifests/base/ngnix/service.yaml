@@ -5,13 +5,14 @@ metadata:
   name: nginx
 spec:
   selector:
-    # app: nginx
-    app: test
+    app: nginx
+    # app: test
   ports:
     # - protocol: TCP       # protocol is optional because Kubernetes defaults it to TCP
     - port: 80
       targetPort: 80        # nginx listen to 80  # Service port 80 -> Pod/container port 80
-
+  # type: ClusterIP
+  type: LoadBalancer
 
 ### NOTES ###
 

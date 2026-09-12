@@ -172,9 +172,50 @@ For Nginx, both values are `80` because Nginx listens on HTTP port `80`.
 The Service selects Pods using labels, for example `app: nginx`, and normally
 routes only to Pods whose readiness probe has succeeded.
 
+### type
+
+`type` controls how a Service is exposed:
+
+- `ClusterIP` exposes the Service only inside the Kubernetes cluster. It is the
+   default type.
+- `LoadBalancer` asks an external load-balancer implementation for an external
+   IP. In a cloud, a cloud controller usually creates the load balancer.
+
+In Kind there is no cloud load-balancer provider, so `LoadBalancer` normally
+stays pending:
+
+```text
+NAME    TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)
+nginx   LoadBalancer   10.96.236.115   <pending>     80:32037/TCP
+```
+
+This still means the Service object was accepted and its ClusterIP remains.
+The `80:32037/TCP` output means the Service also received a NodePort, in this
+case `32037`. The external IP is pending because Kind does not automatically
+provide an external load balancer.
+
+MetalLB supplies that missing implementation for local or bare-metal clusters.
+It assigns an IP from a configured address pool and advertises it on the local
+network. The Service selector and EndpointSlices still determine which Pods
+receive the traffic.
+
+Restore the local Service after the experiment:
+
+```yaml
+type: ClusterIP
+```
+
+```bash
+kubectl apply -f manifests/base/ngnix/service.yaml
+kubectl get service nginx
+```
+
+
+---
+
 ## service.yaml
 
-A Service has two independent parts:
+A Service has 2 independent parts:
 
 ```text
 Service object + ClusterIP + DNS
@@ -218,6 +259,45 @@ selector:
 
 The Pod IP addresses should return to the EndpointSlice. After observing both
 states, the selector experiment is complete.
+
+When the selector is wrong:
+
+```yaml
+selector:
+   app: wrong
+```
+
+The Service itself is still successfully created:
+
+```bash
+kubectl get service nginx
+```
+
+It still has:
+
+- Service name: `nginx`
+- ClusterIP: `10.96.x.x`
+- DNS name: `nginx.default.svc.cluster.local`
+
+But it has no matching Pods, so:
+
+```bash
+kubectl get endpointslices \
+   -l kubernetes.io/service-name=nginx
+```
+
+shows no endpoints.
+
+```text
+Service created successfully -> yes
+Service DNS resolves         -> yes
+Matching backend Pods        -> no
+Application traffic works    -> no
+```
+
+A successful `kubectl apply` only confirms that the Service object was accepted
+by the API server. It does not prove that the Service has healthy Pods behind
+it. That is why EndpointSlices are important.
 
 ## resources / manual 
 

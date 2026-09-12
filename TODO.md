@@ -287,7 +287,7 @@ kubectl get endpointslices \
   -l kubernetes.io/service-name=nginx
 
 ```
-- [ ] Break the selector on purpose. Confirm the endpoint list goes empty and
+- [x] Break the selector on purpose. Confirm the endpoint list goes empty and
       the Service still exists and still resolves
 > checking commands
 ```bash
@@ -298,18 +298,108 @@ kubectl get endpointslices \
 -l kubernetes.io/service-name=nginx
 
 # 2. Break the selector => change selector setting to "selector: app: test"
-# then apply 
+# Edit service.yaml temporarily:
+# selector:
+#   app: test
 
+# Apply the broken selector:
+kubectl apply -f manifests/base/ngnix/service.yaml
 
+# The Service still exists and keeps its ClusterIP:
+kubectl get service nginx
 
+# The EndpointSlice should now have no endpoints:
+kubectl get endpointslices \
+      -l kubernetes.io/service-name=nginx
+
+# Create a temporary Pod for the DNS test:
+kubectl delete pod dns-test --ignore-not-found
+kubectl run dns-test \
+      --image=busybox:1.36 \
+      --restart=Never \
+      --command -- sleep 3600
+kubectl wait --for=condition=Ready pod/dns-test --timeout=120s
+
+# DNS still resolves the Service name and returns its ClusterIP:
+kubectl exec dns-test -- nslookup nginx
+kubectl exec dns-test -- nslookup nginx.default.svc.cluster.local
+
+# Restore service.yaml:
+# selector:
+#   app: nginx
+kubectl apply -f manifests/base/ngnix/service.yaml
+
+# Confirm the Pod endpoints return:
+kubectl get endpointslices \
+      -l kubernetes.io/service-name=nginx
+
+# Clean up the temporary DNS test Pod:
+kubectl delete pod dns-test
 
 ```
-- [ ] Exec into a pod and `curl` the Service by DNS name. Work out the full form
+- [x] Exec into a pod and `curl` the Service by DNS name. Work out the full form
       (`<svc>.<namespace>.svc.cluster.local`) and why the short name also works
-- [ ] Try `type: LoadBalancer`. It will sit `<pending>` forever — **work out
-      why, and what MetalLB does about it.** MetalLB is on filmory's stack table
+> test commands
+```bash
+# 1. Confirm the cluster and Pods
+open -a Docker
+docker info
+kubectl config use-context kind-k8s-sandbox
+kubectl get nodes
+kubectl get pods -l app=nginx -o wide
 
-**Experiment worth doing:** give your stage-4 standalone Pod the *same* labels
+# 2. Confirm the Service and endpoints
+
+kubectl get service nginx
+kubectl get endpointslices \
+-l kubernetes.io/service-name=nginx
+# apply app:ngnix
+kubectl apply -f manifests/base/ngnix/service.yaml
+# Confirm endpoints return:
+kubectl get endpointslices \
+-l kubernetes.io/service-name=nginx
+
+# 3. Create a temporary Pod with curl 
+# Use a persistent temporary Pod -> run multiple tests:
+kubectl delete pod curl-test --ignore-not-found --grace-period=0 --force
+
+kubectl run curl-test \
+--image=curlimages/curl \
+--restart=Never \
+--command -- sleep 3600
+#pod/curl-test created
+
+kubectl wait \
+--for=condition=Ready \
+pod/curl-test \
+--timeout=120s
+#pod/curl-test condition met
+
+# verify:
+kubectl get pod curl-test
+
+# 4. Test the short Service DNS name
+kubectl exec curl-test -- \
+curl -I --max-time 10 http://nginx
+
+# 5. Test the full DNS name
+kubectl exec curl-test -- \
+  curl -I --max-time 10 \
+  http://nginx.default.svc.cluster.local
+
+# Clean up:
+kubectl delete pod curl-test
+```
+
+- [x] Try `type: LoadBalancer`. It will sit `<pending>` forever — **work out
+      why, and what MetalLB does about it.** MetalLB is on filmory's stack table
+```bash
+# apply and then check
+kubectl apply -f manifests/base/ngnix/service.yaml
+kubectl get service nginx
+```
+
+**Experiment worth doing:** give stage-4 standalone Pod the *same* labels
 the Service selects on, and re-apply it. It joins the Service's endpoints, with
 no Deployment involved. A Service selects on labels and has no idea what owns
 the pods it routes to.
@@ -338,7 +428,7 @@ An Ingress object does nothing on its own. It is inert config until a
 | 404 from nginx | Controller reachable, no Ingress rule matched |
 | 503 from nginx | Rule matched, Service has no ready endpoints |
 
-## Stage 8 — MY own image
+## Stage 8 (extra) — my own image
 
 - [ ] Build any trivial image locally with `docker build`
 - [ ] Deploy it. **It will fail with `ErrImagePull`** even though `docker images`
