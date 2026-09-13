@@ -92,9 +92,10 @@ What's next:
     Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug k8s-sandbox-control-plane
     Learn more at https://docs.docker.com/go/debug-cli/
 ```
-- [ ] Find the API server port: `docker ps` shows `127.0.0.1:5xxxx->6443`.
+- [x] Find the API server port: `docker ps` shows `127.0.0.1:5xxxx->6443`.
       Confirm it matches `kubectl config view --minify`
-- [ ] `kind delete cluster --name k8s-sandbox`
+- [ ] `kind delete cluster --name k8s-sandbox` — **deliberately not run.** The
+      cluster is kept for filmory work; teardown is `docker stop` instead.
 
 **Answer before moving on:** why is the kubeconfig pointing at a random high port on localhost rather than at 6443?
 
@@ -228,7 +229,7 @@ kubectl get deployment nginx
 # List the Deployment’s Pods
 kubectl get pods -l app=nginx -o wide
 ```
-- [ ] Get the `selector` / `template.metadata.labels` relationship right. Break
+- [ ] **NOT DONE** — Get the `selector` / `template.metadata.labels` right. Break
       it on purpose once and read the rejection — it is the most common mistake
 > verfiy selector relationship:
 ```bash
@@ -419,7 +420,9 @@ An Ingress object does nothing on its own. It is inert config until a
 - [x] Write the Ingress with `ingressClassName` and a path rule
 - [x] `curl http://localhost:8080/` repeatedly — confirm the backend rotates
 - [x] Trace the full path on paper: host port → ? → ? → ? → pod
-- [ ] **Learn to read the failures**, they are all different causes:
+- [ ] **NOT DONE** — **Learn to read the failures**, all different causes.
+      Method and the four experiments are written up in
+      [notes/KIND.md](notes/KIND.md#reading-the-failures):
 
 ```bash
 # 1. Confirm the Service is healthy
@@ -657,6 +660,25 @@ kubectl get nodes     # give it 30-60s to settle
 Stage 8 is the finish line. At that point: 
 - build a cluster
 - get my own image serving traffic through an Ingress, and tell the failure modes apart 
+
+**Status: closed — 13 September 2026.** 50/53 items. Stages 1, 3, 4, 6 and 8 are
+complete; stage 8, the declared finish line, is 5/5 and was verified against the
+live cluster (image built, `kind load`ed, pod Running and serving its own page,
+and the `:latest` / `imagePullPolicy` trap reproduced).
+
+Three items were consciously left rather than done, and are marked **NOT DONE**
+in place instead of ticked:
+
+| left open | why |
+|---|---|
+| stage 2 — `kind delete cluster` | cluster kept; teardown is `docker stop` |
+| stage 5 — break the selector / template labels match | understood and documented, never broken on purpose |
+| stage 7 — produce the four ingress failures | the one real gap; method written up in [notes/KIND.md](notes/KIND.md#reading-the-failures) |
+
+Of these only the stage 7 one touches the objective above — *tell the failure
+modes apart*. The table and the four experiments that produce each symptom are
+recorded in the notes, so reopening it needs no new curriculum, just an evening.
+
 
 Next : grup project **filmory**  
 

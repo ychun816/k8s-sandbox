@@ -4,6 +4,7 @@
 
 - [Understand Kind](#understand-kind)
 - [Common commands](#commonly-used-commands)
+   - [Read the failures](#read-the-failures)
 - [Kind vs. Minikube](#compare--kind-vs-minikube)
 - [Kind vs. Terraform](#compare--kind-vs-terraform)
 - [Resources](#resource)
@@ -88,6 +89,53 @@ kubectl get pods -n ingress-nginx -o wide  # WHICH NODE? only one has the ports
 curl -v http://localhost:8080/             # -v distinguishes refused vs reset
 kubectl logs -n ingress-nginx deploy/ingress-nginx-controller
 ```
+
+#### read the failures
+
+Four different symptoms, four different causes. The fastest split is whether an
+HTTP status code came back at all:
+
+- **A status code returned** -> the port mapping and the controller are both
+  fine. The fault is above them: routing rules or endpoints.
+- **The connection itself failed** -> the fault is below them. Ingress YAML is
+  not worth reading yet.
+
+| Symptom | Means | First thing to check |
+|---|---|---|
+| Connection refused | Nothing listening on the host port at all | `docker ps` - is the port published on the node container? |
+| Connection reset | Port published, nothing behind it inside the node | `kubectl get pods -n ingress-nginx` - is the controller running? |
+| 404 from nginx | Controller reachable, no Ingress rule matched | `kubectl get ingress` - does a rule cover this host/path? |
+| 503 from nginx | Rule matched, Service has no ready endpoints | `kubectl get endpointslices -l kubernetes.io/service-name=<svc>` |
+
+A 503 is always an endpoints problem, never a routing problem: nginx answered,
+matched a rule and resolved the Service, then found nothing to forward to. Going
+straight to the endpoint list skips the wasted detour through the config.
+
+How to produce each one deliberately, in a sandbox:
+
+```sh
+# 503 - rule matched, no ready endpoints
+kubectl scale deployment nginx --replicas=0
+kubectl wait --for=delete pod -l app=nginx --timeout=90s
+curl -i http://localhost:8080/
+kubectl scale deployment nginx --replicas=5                    # undo
+
+# 404 - controller reachable, no rule matched
+# note: a path rule of "/" with pathType Prefix matches everything,
+# so the only way to have no rule match is to have no rule
+kubectl delete ingress nginx
+curl -i http://localhost:8080/
+kubectl apply -f manifests/base/ngnix/ingress.yaml             # undo
+
+# connection reset - port published, nothing behind it
+kubectl scale deploy -n ingress-nginx ingress-nginx-controller --replicas=0
+curl -i http://localhost:8080/
+kubectl scale deploy -n ingress-nginx ingress-nginx-controller --replicas=1   # undo
+
+# connection refused - nothing listening on that host port at all
+curl -i http://localhost:9999/                                 # never mapped
+```
+
 
 ### stage 8 — your own image
 
