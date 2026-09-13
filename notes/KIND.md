@@ -169,7 +169,7 @@ with providers, a plan phase, and persistent state.
 
 - [Minikube vs Kind: A Comprehensive Comparison](https://betterstack.com/community/guides/scaling-docker/minikube-vs-kubernetes/)
 - [Getting Started with KIND Kubernetes](https://www.youtube.com/watch?v=133B-s1YYCA&list=PL1xPpLHBFNWvKPI0ofmFzJn9lrWiqGukT&index=1)
-
+- [Kubernetes 是什麼？白話解釋 + 判斷你是否真的需要它](https://dongdonggcp.com/2026/07/21/what-is-kubernetes/)
 
 ### namual
 - [Kind | Quick Start (with package manager)](https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager)

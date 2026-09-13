@@ -299,6 +299,14 @@ A successful `kubectl apply` only confirms that the Service object was accepted
 by the API server. It does not prove that the Service has healthy Pods behind
 it. That is why EndpointSlices are important.
 
+---
+
+## ingress 
+Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster. Traffic routing is controlled by rules defined on the Ingress resource.
+![alt text](image-3.png)
+![alt text](image-2.png)
+
+--- 
 ## resources / manual 
 
 - [7 Kubernetes deployment strategies: Pros, cons, and how to choose](https://octopus.com/devops/kubernetes-deployments/kubernetes-deployment-strategies/)

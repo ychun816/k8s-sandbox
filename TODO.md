@@ -409,17 +409,137 @@ the pods it routes to.
 An Ingress object does nothing on its own. It is inert config until a
 *controller* reads it and reconfigures itself.
 
-- [ ] Install an ingress controller (kind publishes a
+- [x] Install an ingress controller (kind publishes a
       [ready-made nginx manifest](https://kind.sigs.k8s.io/docs/user/ingress/))
-- [ ] `kubectl get pods -n ingress-nginx -o wide` — **which node did it land
+- [x] `kubectl get pods -n ingress-nginx -o wide` — **which node did it land
       on?** Only one node has your port mappings from stage 3
-- [ ] If it is on the wrong node, work out how to make the scheduler place it on
+- [x] If it is on the wrong node, work out how to make the scheduler place it on
       the labelled one — and why a `nodeSelector` alone is not enough for a
       control-plane node
-- [ ] Write the Ingress with `ingressClassName` and a path rule
-- [ ] `curl http://localhost:8080/` repeatedly — confirm the backend rotates
-- [ ] Trace the full path on paper: host port → ? → ? → ? → pod
+- [x] Write the Ingress with `ingressClassName` and a path rule
+- [x] `curl http://localhost:8080/` repeatedly — confirm the backend rotates
+- [x] Trace the full path on paper: host port → ? → ? → ? → pod
 - [ ] **Learn to read the failures**, they are all different causes:
+
+```bash
+# 1. Confirm the Service is healthy
+kubectl apply -f manifests/base/ngnix/service.yaml
+kubectl get service nginx
+kubectl get endpointslices \
+-l kubernetes.io/service-name=nginx
+
+# 2. Install the Kind Ingress controller
+kubectl apply -f \
+  https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# wait 
+kubectl wait \
+  --namespace ingress-nginx \
+  --for=condition=Ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=180s
+# , then check 
+kubectl get pods \
+  -n ingress-nginx \
+  -o wide
+# pod/ingress-nginx-controller-54754544b9-psz6n condition met
+  
+# 3. Create the Ingress manifest
+# 4. Validate (dry run) and apply
+kubectl apply --dry-run=client \
+  -f manifests/base/ngnix/ingress.yaml
+
+kubectl apply \
+-f manifests/base/ngnix/ingress.yaml
+
+# Verify
+kubectl get ingress nginx
+kubectl describe ingress nginx
+
+# 5. Test from Mac
+curl -i http://localhost:8080/
+
+# 6. Trace and diagnose
+kubectl get pods -n ingress-nginx -o wide
+kubectl get ingress nginx
+kubectl get service nginx
+
+kubectl get endpointslices \
+-l kubernetes.io/service-name=nginx
+
+# 7. Mark Stage 7 tasks
+kubectl get pods -n ingress-nginx -o wide
+
+# verify the Ingress rule:
+kubectl get ingress nginx
+kubectl describe ingress nginx
+```
+
+Trace the full path:
+```bash
+# (1) host -> node container
+# Mac's port 8080 is published into the control-plane container.
+# 0.0.0.0:8080->80/tcp   --> the first port translation
+docker ps --filter name=k8s-sandbox-control-plane --format "{{.Ports}}"
+# 0.0.0.0:8080->80/tcp, 0.0.0.0:8443->443/tcp, 127.0.0.1:60270->6443/tcp
+
+# (2) node container -> controller pod
+# Which pod is listening on port 80 inside that node, and on which node.
+# LOOK FOR: NODE = k8s-sandbox-control-plane  (the one with the mapping above)
+kubectl get pods -n ingress-nginx -o wide
+# NAME                                       READY   STATUS    RESTARTS   AGE   IP           NODE                        NOMINATED NODE   READINESS GATES
+# ingress-nginx-controller-6588cd676-mp52f   1/1     Running   0          87m   10.244.0.5   k8s-sandbox-control-plane   <none>           <none>
+
+# (2-1) confirm it binds the node's port 80, not just a container port
+# LOOK FOR: hostPort: 80  and  hostPort: 443
+kubectl get deploy -n ingress-nginx ingress-nginx-controller \
+-o jsonpath='{.spec.template.spec.containers[0].ports}{"\n"}'
+# [{"containerPort":80,"hostPort":80,"name":"http","protocol":"TCP"},{"containerPort":443,"hostPort":443,"name":"https","protocol":"TCP"},{"containerPort":8443,"name":"webhook","protocol":"TCP"}]
+
+# (3) controller -> which Service?
+# The rule the controller consults to pick a backend Service.
+# LOOK FOR: spec.rules[].http.paths[].backend.service.name and .port.number
+kubectl get ingress nginx -o yaml | sed -n '/^spec:/,/^status:/p'
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#   - http:
+#       paths:
+#       - backend:
+#           service:
+#             name: nginx
+#             port:
+#               number: 80
+#         path: /
+#         pathType: Prefix
+# status:
+
+
+# (4) Service -> which pods?
+# The selector, and the second+third port translations.
+# LOOK FOR: spec.selector, spec.ports[].port, spec.ports[].targetPort
+kubectl get svc nginx -o jsonpath='{.spec.selector}{"\n"}{.spec.ports}{"\n"}'
+# {"app":"nginx"}
+# [{"nodePort":32037,"port":80,"protocol":"TCP","targetPort":80}]
+
+# (5) the endpoint list the Service actually resolved to
+# LOOK FOR: the pod IPs -- the final hop
+kubectl get endpointslices -l kubernetes.io/service-name=nginx \
+-o jsonpath='{.items[*].endpoints[*].addresses[*]}{"\n"}'
+# 10.244.1.2 10.244.1.3 10.244.2.3 10.244.2.2 10.244.2.4
+
+# (6) proof of the whole path in one line, from the controller's own log
+# LOOK FOR: the upstream pod IP:port it forwarded your request to
+curl -s -o /dev/null http://localhost:8080/
+kubectl logs -n ingress-nginx deploy/ingress-nginx-controller --tail=1
+# 172.19.0.1 - - [12/Sep/2026:23:33:09 +0000] "GET / HTTP/1.1" 200 896 "-" "curl/8.7.1" 77 0.031 [default-nginx-80] [] 10.244.2.4:80 896 0.030 200 a16969f418cf30fd636dc06933e18206
+
+kubectl scale deployment nginx --replicas=0
+curl -i http://localhost:8080/
+kubectl scale deployment nginx --replicas=5
+
+```
+
 
 | Symptom | Means |
 |---|---|
@@ -428,18 +548,28 @@ An Ingress object does nothing on its own. It is inert config until a
 | 404 from nginx | Controller reachable, no Ingress rule matched |
 | 503 from nginx | Rule matched, Service has no ready endpoints |
 
-## Stage 8 (extra) — my own image
+## Stage 8 — my own image
 
-- [ ] Build any trivial image locally with `docker build`
-- [ ] Deploy it. **It will fail with `ErrImagePull`** even though `docker images`
+- [x] Build any trivial image locally with `docker build`
+- [x] Deploy it. **It will fail with `ErrImagePull`** even though `docker images`
       clearly shows it
-- [ ] Work out why — the node has its own containerd, separate from your host
+```bash
+kubectl run nginx --image=nginx:v1
+kubectl get pods -l run=nginx
+# NAME    READY   STATUS         RESTARTS   AGE
+# nginx   0/1     ErrImagePull   0          5s
+```
+- [x] Work out why — the node has its own containerd, separate from your host
 - [ ] Fix it with `kind load docker-image`
 - [ ] Set `imagePullPolicy` correctly for a local tag, and work out why `:latest`
       is the wrong tag to use here
 
-**This is the single highest-value kind-specific thing to know.** Almost every
-"but the image is right there" problem is this.
+```bash
+docker build -t nginx:v1 .
+```
+> That trailing dot is the build context —> the directory Docker sends to the daemon and looks for the Dockerfile in. 
+
+![alt text](image.png)
 
 ---
 
