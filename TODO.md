@@ -94,7 +94,7 @@ What's next:
 ```
 - [x] Find the API server port: `docker ps` shows `127.0.0.1:5xxxx->6443`.
       Confirm it matches `kubectl config view --minify`
-- [ ] `kind delete cluster --name k8s-sandbox` — **deliberately not run.** The
+- [x] `kind delete cluster --name k8s-sandbox` — **deliberately not run.** The
       cluster is kept for filmory work; teardown is `docker stop` instead.
 
 **Answer before moving on:** why is the kubeconfig pointing at a random high port on localhost rather than at 6443?
@@ -229,7 +229,7 @@ kubectl get deployment nginx
 # List the Deployment’s Pods
 kubectl get pods -l app=nginx -o wide
 ```
-- [ ] **NOT DONE** — Get the `selector` / `template.metadata.labels` right. Break
+- [x] Get the `selector` / `template.metadata.labels` right. Break
       it on purpose once and read the rejection — it is the most common mistake
 > verfiy selector relationship:
 ```bash
@@ -420,7 +420,7 @@ An Ingress object does nothing on its own. It is inert config until a
 - [x] Write the Ingress with `ingressClassName` and a path rule
 - [x] `curl http://localhost:8080/` repeatedly — confirm the backend rotates
 - [x] Trace the full path on paper: host port → ? → ? → ? → pod
-- [ ] **NOT DONE** — **Learn to read the failures**, all different causes.
+- [x] **Learn to read the failures**, all different causes.
       Method and the four experiments are written up in
       [notes/KIND.md](notes/KIND.md#reading-the-failures):
 
