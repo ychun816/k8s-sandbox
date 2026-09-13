@@ -560,8 +560,8 @@ kubectl get pods -l run=nginx
 # nginx   0/1     ErrImagePull   0          5s
 ```
 - [x] Work out why — the node has its own containerd, separate from your host
-- [ ] Fix it with `kind load docker-image`
-- [ ] Set `imagePullPolicy` correctly for a local tag, and work out why `:latest`
+- [x] Fix it with `kind load docker-image`
+- [x] Set `imagePullPolicy` correctly for a local tag, and work out why `:latest`
       is the wrong tag to use here
 
 ```bash
@@ -571,16 +571,96 @@ docker build -t nginx:v1 .
 
 ![alt text](image.png)
 
+test commands for `imagePullPolicy` , `:latest` checks
+```bash
+# 0. control for the test: confirm BOTH images are already on the node
+docker exec k8s-sandbox-worker crictl images | grep -E "myapp|nginx"
+# docker.io/library/myapp   latest   29MB   <- present, and still fails
+# docker.io/library/nginx   v1       29MB   <- present, and works
+
+# 1. real version tag -> defaults to IfNotPresent -> uses the local copy
+kubectl run nginx --image=nginx:v1
+kubectl get pod nginx \
+-o jsonpath='{.spec.containers[0].image} -> {.spec.containers[0].imagePullPolicy}{"\n"}'
+# nginx:v1 -> IfNotPresent
+kubectl get pod nginx
+# nginx   1/1   Running
+
+# prove it is the custom image, not stock nginx
+kubectl exec nginx -- curl -s localhost
+# nginx v1 - chun
+
+# 2. :latest tag -> defaults to Always -> ignores the loaded image
+kubectl run latest-test --image=myapp:latest
+kubectl get pod latest-test \
+-o jsonpath='{.spec.containers[0].image} -> {.spec.containers[0].imagePullPolicy}{"\n"}'
+# myapp:latest -> Always
+kubectl get pod latest-test
+# latest-test   0/1   ErrImagePull
+
+# 3. read why it failed
+kubectl describe pod latest-test | sed -n '/^Events:/,$p' | tail -5
+# Failed to pull image "myapp:latest": failed to resolve reference
+# "docker.io/library/myapp:latest": pull access denied, repository does not exist
+
+# 4. cleanup - remove the two standalone test pods
+#    NOTE: these are bare pods from `kubectl run`. The Deployment's pods are
+#    named nginx-<replicaset>-<id> and are NOT touched by this.
+kubectl delete pod latest-test --ignore-not-found
+kubectl delete pod nginx --ignore-not-found
+
+# 5. verify cleanup -> only the Deployment's pods should remain
+kubectl get pods
+# nginx-59c4c87bc6-xxxxx   1/1   Running   <- Deployment replicas, keep these
+# no standalone 'nginx' or 'latest-test' rows
+
+# the Service should still resolve to its endpoints
+kubectl get endpointslices -l kubernetes.io/service-name=nginx \
+-o jsonpath='{.items[*].endpoints[*].addresses[*]}{"\n"}'
+
+# and the ingress path should still serve
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/
+# 200
+
+# (extraa ) drop the test images from the host Docker
+docker rmi myapp:latest myapp:v1 nginx:v1
+docker images | grep -E "myapp|nginx:v1"
+# expect: no output
+
+# (extra ) drop them from each kind node's containerd
+for n in k8s-sandbox-control-plane k8s-sandbox-worker k8s-sandbox-worker2; do
+  docker exec "$n" crictl rmi docker.io/library/myapp:latest docker.io/library/nginx:v1
+done
+docker exec k8s-sandbox-worker crictl images | grep -E "myapp|nginx"
+# expect: only docker.io/library/nginx latest (the image the Deployment uses)
+```
+
+
+## stop & init docker 
+stop all running dockers
+```bash
+docker stop k8s-sandbox-control-plane k8s-sandbox-worker k8s-sandbox-worker2
+
+# verify 
+docker ps
+```
+bring it back
+```bash
+docker start k8s-sandbox-control-plane k8s-sandbox-worker k8s-sandbox-worker2
+kubectl get nodes     # give it 30-60s to settle
+```
+
 ---
 
-## Where this ends
+## end at stage 8 
 
-Stage 8 is the finish line. At that point you can build a cluster, get your own
-image serving traffic through an Ingress, and tell the failure modes apart —
-which was the whole objective.
+Stage 8 is the finish line. At that point: 
+- build a cluster
+- get my own image serving traffic through an Ingress, and tell the failure modes apart 
 
-What comes next belongs to **filmory**, not here. Listed so the handover is
-obvious, but these are not sandbox stages and there is nothing to tick off:
+Next : grup project **filmory**  
+
+- [filmory/INFRA.md](../filmory/INFRA.md)
 
 | what | filmory phase |
 |---|---|
@@ -590,16 +670,8 @@ obvious, but these are not sandbox stages and there is nothing to tick off:
 | CI — build, push, bump the tag | Phase 6 |
 | cert-manager, Prometheus, Loki | Phase 7+ |
 
-Track the order in [filmory/INFRA.md](../filmory/INFRA.md), not the README's
-tech table — INFRA.md deliberately works as a walking skeleton and warns against
-working down the table.
 
-**Come back here** only when one of those needs a throwaway cluster to fail on
-first: a chart that will not template, a controller that will not schedule, an
-overlay that produces the wrong YAML. That is the sandbox earning its keep, and
-it does not need a new curriculum.
-
-**One divergence to decide when you get there:** stage 7 teaches the
+**One divergence to decide when get there:** stage 7 teaches the
 `networking.k8s.io/v1` Ingress, but filmory's stack table specifies **Gateway
 API**. Different APIs, same problem. Learn Ingress first — simpler, and far more
 written about — then port it as its own exercise before committing in filmory.

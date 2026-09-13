@@ -306,6 +306,7 @@ Ingress exposes HTTP and HTTPS routes from outside the cluster to services withi
 ![alt text](image-3.png)
 ![alt text](image-2.png)
 
+
 --- 
 ## resources / manual 
 
